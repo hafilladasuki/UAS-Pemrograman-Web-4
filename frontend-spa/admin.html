@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Report - Dashboard Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <div id="app" v-cloak>
+        <!-- ================= PANEL LOGIN ================= -->
+        <div v-if="!isLoggedIn" class="min-h-screen flex items-center justify-center px-4">
+            <div class="max-w-md w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-white">Administrator Login</h2>
+                    <p class="text-xs text-slate-400 mt-1">Gunakan akun admin yang terdaftar di database</p>
+                </div>
+                <div v-if="errorMsg" class="mb-4 p-3 bg-red-900/50 border border-red-700 text-red-200 rounded-lg text-sm">⚠️ {{ errorMsg }}</div>
+                <form @submit.prevent="handleLogin" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Email</label>
+                        <input v-model="loginForm.email" type="email" required placeholder="admin@gmail.com" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Password</label>
+                        <input v-model="loginForm.password" type="password" required placeholder="••••••••" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button type="submit" :disabled="loading" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-sm transition">Masuk Panel</button>
+                </form>
+                <div class="text-center mt-4"><a href="index.html" class="text-xs text-indigo-400 hover:underline"><i class="fas fa-arrow-left"></i> Kembali ke Pengaduan Publik</a></div>
+            </div>
+        </div>
+
+        <!-- ================= PANEL DASHBOARD ADMIN ================= -->
+        <div v-else class="min-h-screen flex flex-col">
+            <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-md">
+                <div class="flex items-center gap-3">
+                    <span class="bg-red-600 text-white text-xs px-2.5 py-0.5 rounded-full uppercase font-bold tracking-wider">Control Panel</span>
+                    <h1 class="text-lg font-bold text-white">Halo, Budi Admin ⚙️</h1>
+                </div>
+                <button @click="handleLogout" class="bg-slate-700 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition"><i class="fas fa-power-off mr-1"></i> Keluar</button>
+            </header>
+
+            <main class="flex-1 p-6 max-w-6xl w-full mx-auto">
+                <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden">
+                    <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-750">
+                        <h2 class="font-bold text-white text-base">Database Management Pengaduan</h2>
+                        <button @click="loadAdminData" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition"><i class="fas fa-sync" :class="{'fa-spin': loading}"></i> Refresh</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-700 text-slate-300 text-xs font-bold border-b border-slate-600 uppercase">
+                                    <th class="py-3 px-4 w-16">ID</th>
+                                    <th class="py-3 px-4 w-40">Kategori</th>
+                                    <th class="py-3 px-4">Detail Aduan</th>
+                                    <th class="py-3 px-4 text-center w-24">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700 text-xs text-slate-300">
+                                <tr v-if="listPengaduan.length === 0"><td colspan="4" class="py-6 text-center text-slate-500">Belum ada aduan masuk.</td></tr>
+                                <tr v-for="item in listPengaduan" :key="item.id" class="hover:bg-slate-700/20">
+                                <td class="py-3 px-4 font-mono">#{{ item.id }}</td>
+                                <td class="py-3 px-4"><span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold">{{ item.nama_kategori }}</span></td>
+                                <td class="py-3 px-4">{{ item.deskripsi }}</td>
+                                <td class="py-3 px-4 text-center">
+                                    <button @click="hapusData(item.id)" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 px-2 py-1 rounded text-[11px] font-bold transition"><i class="fas fa-trash"></i> Hapus</button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    isLoggedIn: false,
+                    loading: false,
+                    errorMsg: '',
+                    loginForm: { email: '', password: '' },
+                    listPengaduan: [],
+                    apiUrl: 'http://localhost:8080/api'
+                }
+            },
+            mounted() {
+                if (localStorage.getItem('isLoggedIn') === 'true' && localStorage.getItem('token')) {
+                    this.isLoggedIn = true;
+                    this.loadAdminData();
+                }
+            },
+            methods: {
+                async handleLogin() {
+                    this.loading = true; this.errorMsg = '';
+                    try {
+                        const response = await axios.post(`${this.apiUrl}/login`, this.loginForm);
+                        if (response.status === 200 || response.data.token) {
+                            localStorage.setItem('isLoggedIn', 'true');
+                            localStorage.setItem('token', response.data.token);
+                            this.isLoggedIn = true;
+                            this.loadAdminData();
+                        }
+                    } catch (e) {
+                        this.errorMsg = 'Kombinasi akun salah atau server XAMPP mati!';
+                    } finally { this.loading = false; }
+                },
+                async loadAdminData() {
+                    this.loading = true;
+                    try {
+                        const token = localStorage.getItem('token');
+                        const response = await axios.get(`${this.apiUrl}/pengaduan`, { headers: { 'Authorization': `Bearer ${token}` } });
+                        this.listPengaduan = Array.isArray(response.data) ? response.data : (response.data.data || []);
+                    } catch (e) { console.error(e); } finally { this.loading = false; }
+                },
+                async hapusData(id) {
+                    if (confirm("Hapus aduan ini dari database phpMyAdmin?")) {
+                        try {
+                            const token = localStorage.getItem('token');
+                            const response = await axios.post(`${this.apiUrl}/pengaduan/delete/${id}`, {}, { headers: { 'Authorization': `Bearer ${token}` } });
+                            if (response.data.success) { this.loadAdminData(); }
+                        } catch (e) { alert("Gagal menghapus!"); }
+                    }
+                },
+                handleLogout() { localStorage.clear(); this.isLoggedIn = false; }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
